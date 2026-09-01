@@ -57,10 +57,15 @@ public class SceneExporterWindow : EditorWindow
     private void CollectMeshes(GameObject gameObject, List<Mesh> meshes)
     {
         MeshFilter meshFilter = gameObject.GetComponent<MeshFilter>();
+        SkinnedMeshRenderer skinnedMeshRenderer = gameObject.GetComponent<SkinnedMeshRenderer>();
 
         if (meshFilter != null && meshFilter.sharedMesh != null)
         {
             meshes.Add(meshFilter.sharedMesh);
+        }
+        else if (skinnedMeshRenderer != null && skinnedMeshRenderer.sharedMesh != null)
+        {
+            meshes.Add(skinnedMeshRenderer.sharedMesh);
         }
 
         foreach (Transform child in gameObject.transform)
@@ -80,18 +85,21 @@ public class SceneExporterWindow : EditorWindow
             var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
 
             GameObject[] rootObjects = scene.GetRootGameObjects();
-            List<Mesh> meshes = new List<Mesh>();
 
+            writer.Write(rootObjects.Length);
             foreach (GameObject rootObject in rootObjects)
             {
+                WriteString(writer, rootObject.name);
+
+                List<Mesh> meshes = new List<Mesh>();
+
                 CollectMeshes(rootObject, meshes);
-            }
 
-            writer.Write(meshes.Count);
-
-            foreach (Mesh mesh in meshes)
-            {
-                WriteMesh(writer, mesh);
+                writer.Write(meshes.Count);
+                foreach (Mesh mesh in meshes)
+                {
+                    WriteMesh(writer, mesh);
+                }
             }
         }
 
