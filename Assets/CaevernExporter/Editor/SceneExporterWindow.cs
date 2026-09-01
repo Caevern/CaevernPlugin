@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 using System.IO;
+using System.Text;
 using System.Collections.Generic;
 
 public class SceneExporterWindow : EditorWindow
@@ -73,6 +74,9 @@ public class SceneExporterWindow : EditorWindow
         using (FileStream stream = File.Create(outputPath))
         using (BinaryWriter writer = new BinaryWriter(stream))
         {
+            writer.Write(new byte[] { (byte)'C', (byte)'A', (byte)'E', (byte)'V' });
+            writer.Write(1); // Format version
+
             var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
 
             GameObject[] rootObjects = scene.GetRootGameObjects();
@@ -96,7 +100,7 @@ public class SceneExporterWindow : EditorWindow
 
     private void WriteMesh(BinaryWriter writer, Mesh mesh)
     {
-        writer.Write(mesh.name);
+        WriteString(writer, mesh.name);
         Vector3[] vertices = mesh.vertices;
         writer.Write(vertices.Length);
 
@@ -114,6 +118,14 @@ public class SceneExporterWindow : EditorWindow
         {
             writer.Write(triangle);
         }
+    }
+
+    private void WriteString(BinaryWriter writer, string value)
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes(value);
+
+        writer.Write((uint)bytes.Length);
+        writer.Write(bytes);
     }
 }
 
