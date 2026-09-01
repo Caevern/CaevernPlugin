@@ -114,9 +114,9 @@ public class SceneExporterWindow : EditorWindow
         int[] triangles = mesh.triangles;
         writer.Write(triangles.Length);
 
-        foreach (int triangle in triangles)
+        foreach (int index in triangles)
         {
-            writer.Write(triangle);
+            writer.Write(index);
         }
     }
 
