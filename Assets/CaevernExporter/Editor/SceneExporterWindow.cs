@@ -1,5 +1,7 @@
 using UnityEditor;
 using UnityEngine;
+using System.IO;
+using System.Collections.Generic;
 
 public class SceneExporterWindow : EditorWindow
 {
@@ -23,11 +25,8 @@ public class SceneExporterWindow : EditorWindow
             "Scene Exporter",
             EditorStyles.boldLabel
         );
-
         EditorGUILayout.Space();
-
         EditorGUILayout.BeginHorizontal();
-
         EditorGUILayout.LabelField(
             string.IsNullOrEmpty(outputPath)
                 ? "No file selected"
@@ -45,40 +44,75 @@ public class SceneExporterWindow : EditorWindow
         }
 
         EditorGUILayout.EndHorizontal();
-
         EditorGUILayout.Space();
-
         GUI.enabled = !string.IsNullOrEmpty(outputPath);
-
         if (GUILayout.Button("Export Scene"))
         {
             ExportScene();
         }
-
         GUI.enabled = true;
+    }
+
+    private void CollectMeshes(GameObject gameObject, List<Mesh> meshes)
+    {
+        MeshFilter meshFilter = gameObject.GetComponent<MeshFilter>();
+
+        if (meshFilter != null && meshFilter.sharedMesh != null)
+        {
+            meshes.Add(meshFilter.sharedMesh);
+        }
+
+        foreach (Transform child in gameObject.transform)
+        {
+            CollectMeshes(child.gameObject, meshes);
+        }
     }
 
     private void ExportScene()
     {
-        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-
-        GameObject[] rootObjects = scene.GetRootGameObjects();
-
-        foreach (GameObject rootObject in rootObjects)
+        using (FileStream stream = File.Create(outputPath))
+        using (BinaryWriter writer = new BinaryWriter(stream))
         {
-            ExportGameObject(rootObject);
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+
+            GameObject[] rootObjects = scene.GetRootGameObjects();
+            List<Mesh> meshes = new List<Mesh>();
+
+            foreach (GameObject rootObject in rootObjects)
+            {
+                CollectMeshes(rootObject, meshes);
+            }
+
+            writer.Write(meshes.Count);
+
+            foreach (Mesh mesh in meshes)
+            {
+                WriteMesh(writer, mesh);
+            }
         }
 
-        Debug.Log($"Exporting scene to {outputPath}");
+        Debug.Log($"Exported binary scene to: {outputPath}");
     }
 
-    private void ExportGameObject(GameObject gameObject)
+    private void WriteMesh(BinaryWriter writer, Mesh mesh)
     {
-        Debug.Log($"Object: {gameObject.name}");
+        writer.Write(mesh.name);
+        Vector3[] vertices = mesh.vertices;
+        writer.Write(vertices.Length);
 
-        foreach (Transform child in gameObject.transform)
+        foreach (Vector3 vertex in vertices)
         {
-            ExportGameObject(child.gameObject);
+            writer.Write(vertex.x);
+            writer.Write(vertex.y);
+            writer.Write(vertex.z);
+        }
+
+        int[] triangles = mesh.triangles;
+        writer.Write(triangles.Length);
+
+        foreach (int triangle in triangles)
+        {
+            writer.Write(triangle);
         }
     }
 }
