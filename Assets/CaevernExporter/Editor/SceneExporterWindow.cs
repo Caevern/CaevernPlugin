@@ -54,7 +54,7 @@ public class SceneExporterWindow : EditorWindow
         GUI.enabled = true;
     }
 
-    private void CollectMeshes(GameObject gameObject, List<(Mesh mesh, Transform transform)> meshes, bool isRoot)
+    private void TraverseGameObjects(GameObject gameObject, List<(Mesh mesh, Transform transform)> meshes, bool isRoot)
     {
         MeshFilter meshFilter = gameObject.GetComponent<MeshFilter>();
         SkinnedMeshRenderer skinnedMeshRenderer = gameObject.GetComponent<SkinnedMeshRenderer>();
@@ -77,7 +77,35 @@ public class SceneExporterWindow : EditorWindow
 
         foreach (Transform child in gameObject.transform)
         {
-            CollectMeshes(child.gameObject, meshes, false);
+            TraverseGameObjects(child.gameObject, meshes, false);
+        }
+    }
+
+    private void CollectMeshes(GameObject gameObject, List<Mesh> meshes)
+    {
+        MeshFilter meshFilter = gameObject.GetComponent<MeshFilter>();
+        SkinnedMeshRenderer skinnedMeshRenderer = gameObject.GetComponent<SkinnedMeshRenderer>();
+
+        if (meshFilter != null && meshFilter.sharedMesh != null)
+        {
+            Mesh mesh = meshFilter.sharedMesh;
+            if (!meshes.Contains(mesh))
+            {
+                meshes.Add(mesh);
+            }
+        }
+        else if (skinnedMeshRenderer != null && skinnedMeshRenderer.sharedMesh != null)
+        {
+            Mesh mesh = skinnedMeshRenderer.sharedMesh;
+            if (!meshes.Contains(mesh))
+            {
+                meshes.Add(mesh);
+            }
+        }
+
+        foreach (Transform child in gameObject.transform)
+        {
+            CollectMeshes(child.gameObject, meshes);
         }
     }
 
@@ -93,6 +121,18 @@ public class SceneExporterWindow : EditorWindow
 
             GameObject[] rootObjects = scene.GetRootGameObjects();
 
+            List<Mesh> meshes = new List<Mesh>();
+            foreach (GameObject rootObject in rootObjects)
+            {
+                CollectMeshes(rootObject, meshes);
+            }
+
+            writer.Write(meshes.Count);
+            foreach (Mesh mesh in meshes)
+            {
+                WriteMesh(writer, mesh);
+            }
+
             writer.Write(rootObjects.Length);
             foreach (GameObject rootObject in rootObjects)
             {
@@ -107,14 +147,14 @@ public class SceneExporterWindow : EditorWindow
                 writer.Write(rootObject.transform.localScale.y);
                 writer.Write(rootObject.transform.localScale.z);
 
-                List<(Mesh mesh, Transform transform)> meshes = new();
+                List<(Mesh mesh, Transform transform)> gameObjects = new();
 
-                CollectMeshes(rootObject, meshes, true);
+                TraverseGameObjects(rootObject, gameObjects, true);
 
-                writer.Write(meshes.Count);
-                foreach (var (mesh, transform) in meshes)
+                writer.Write(gameObjects.Count);
+                foreach (var (mesh, transform) in gameObjects)
                 {
-                    WriteMesh(writer, mesh, transform, rootObject.transform);
+                    WriteMeshData(writer, mesh, transform, rootObject.transform);
                 }
             }
         }
@@ -122,7 +162,30 @@ public class SceneExporterWindow : EditorWindow
         Debug.Log($"Exported binary scene to: {outputPath}");
     }
 
-    private void WriteMesh(BinaryWriter writer, Mesh mesh, Transform transform, Transform rootTransform)
+    private void WriteMesh(BinaryWriter writer, Mesh mesh)
+    {
+        WriteString(writer, mesh.name);
+
+        Vector3[] vertices = mesh.vertices;
+        writer.Write(vertices.Length);
+
+        foreach (Vector3 vertex in vertices)
+        {
+            writer.Write(vertex.x);
+            writer.Write(vertex.y);
+            writer.Write(vertex.z);
+        }
+
+        int[] triangles = mesh.triangles;
+        writer.Write(triangles.Length);
+
+        foreach (int index in triangles)
+        {
+            writer.Write(index);
+        }
+    }
+
+    private void WriteMeshData(BinaryWriter writer, Mesh mesh, Transform transform, Transform rootTransform)
     {
         WriteString(writer, mesh.name);
 
@@ -146,24 +209,6 @@ public class SceneExporterWindow : EditorWindow
             writer.Write(1f);
             writer.Write(1f);
             writer.Write(1f);
-        }
-
-        Vector3[] vertices = mesh.vertices;
-        writer.Write(vertices.Length);
-
-        foreach (Vector3 vertex in vertices)
-        {
-            writer.Write(vertex.x);
-            writer.Write(vertex.y);
-            writer.Write(vertex.z);
-        }
-
-        int[] triangles = mesh.triangles;
-        writer.Write(triangles.Length);
-
-        foreach (int index in triangles)
-        {
-            writer.Write(index);
         }
     }
 
