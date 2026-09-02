@@ -154,7 +154,8 @@ public class SceneExporterWindow : EditorWindow
                 writer.Write(gameObjects.Count);
                 foreach (var (mesh, transform) in gameObjects)
                 {
-                    WriteMeshData(writer, mesh, transform, rootObject.transform);
+                    int mesh_index = meshes.IndexOf(mesh);
+                    WriteMeshData(writer, mesh, transform, rootObject.transform, mesh_index);
                 }
             }
         }
@@ -185,9 +186,9 @@ public class SceneExporterWindow : EditorWindow
         }
     }
 
-    private void WriteMeshData(BinaryWriter writer, Mesh mesh, Transform transform, Transform rootTransform)
+    private void WriteMeshData(BinaryWriter writer, Mesh mesh, Transform transform, Transform rootTransform, int mesh_index)
     {
-        WriteString(writer, mesh.name);
+        WriteString(writer, mesh.name + "@" + mesh_index);
 
         if (transform) {
             writer.Write(transform.position.x - rootTransform.position.x);
