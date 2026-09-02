@@ -54,23 +54,30 @@ public class SceneExporterWindow : EditorWindow
         GUI.enabled = true;
     }
 
-    private void CollectMeshes(GameObject gameObject, List<Mesh> meshes)
+    private void CollectMeshes(GameObject gameObject, List<(Mesh mesh, Transform transform)> meshes, bool isRoot)
     {
         MeshFilter meshFilter = gameObject.GetComponent<MeshFilter>();
         SkinnedMeshRenderer skinnedMeshRenderer = gameObject.GetComponent<SkinnedMeshRenderer>();
 
+        Transform transform;
+        if (!isRoot) {
+            transform = gameObject.transform;
+        } else {
+            transform = null;
+        }
+
         if (meshFilter != null && meshFilter.sharedMesh != null)
         {
-            meshes.Add(meshFilter.sharedMesh);
+            meshes.Add((meshFilter.sharedMesh, transform));
         }
         else if (skinnedMeshRenderer != null && skinnedMeshRenderer.sharedMesh != null)
         {
-            meshes.Add(skinnedMeshRenderer.sharedMesh);
+            meshes.Add((skinnedMeshRenderer.sharedMesh, transform));
         }
 
         foreach (Transform child in gameObject.transform)
         {
-            CollectMeshes(child.gameObject, meshes);
+            CollectMeshes(child.gameObject, meshes, false);
         }
     }
 
@@ -90,15 +97,24 @@ public class SceneExporterWindow : EditorWindow
             foreach (GameObject rootObject in rootObjects)
             {
                 WriteString(writer, rootObject.name);
+                writer.Write(-rootObject.transform.position.x);
+                writer.Write(rootObject.transform.position.y);
+                writer.Write(rootObject.transform.position.z);
+                writer.Write(rootObject.transform.eulerAngles.x);
+                writer.Write(rootObject.transform.eulerAngles.y);
+                writer.Write(rootObject.transform.eulerAngles.z);
+                writer.Write(rootObject.transform.localScale.x);
+                writer.Write(rootObject.transform.localScale.y);
+                writer.Write(rootObject.transform.localScale.z);
 
-                List<Mesh> meshes = new List<Mesh>();
+                List<(Mesh mesh, Transform transform)> meshes = new();
 
-                CollectMeshes(rootObject, meshes);
+                CollectMeshes(rootObject, meshes, true);
 
                 writer.Write(meshes.Count);
-                foreach (Mesh mesh in meshes)
+                foreach (var (mesh, transform) in meshes)
                 {
-                    WriteMesh(writer, mesh);
+                    WriteMesh(writer, mesh, transform, rootObject.transform);
                 }
             }
         }
@@ -106,9 +122,32 @@ public class SceneExporterWindow : EditorWindow
         Debug.Log($"Exported binary scene to: {outputPath}");
     }
 
-    private void WriteMesh(BinaryWriter writer, Mesh mesh)
+    private void WriteMesh(BinaryWriter writer, Mesh mesh, Transform transform, Transform rootTransform)
     {
         WriteString(writer, mesh.name);
+
+        if (transform) {
+            writer.Write(transform.position.x - rootTransform.position.x);
+            writer.Write(transform.position.y - rootTransform.position.y);
+            writer.Write(transform.position.z - rootTransform.position.z);
+            writer.Write(transform.eulerAngles.x);
+            writer.Write(transform.eulerAngles.y);
+            writer.Write(transform.eulerAngles.z);
+            writer.Write(transform.localScale.x);
+            writer.Write(transform.localScale.y);
+            writer.Write(transform.localScale.z);
+        } else {
+            writer.Write(0f);
+            writer.Write(0f);
+            writer.Write(0f);
+            writer.Write(0f);
+            writer.Write(0f);
+            writer.Write(0f);
+            writer.Write(1f);
+            writer.Write(1f);
+            writer.Write(1f);
+        }
+
         Vector3[] vertices = mesh.vertices;
         writer.Write(vertices.Length);
 
