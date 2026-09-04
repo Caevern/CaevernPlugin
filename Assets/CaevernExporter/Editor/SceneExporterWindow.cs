@@ -156,6 +156,20 @@ public class SceneExporterWindow : EditorWindow
                         materials.Add(material);
                     }
                     WriteString(writer, material.name + "@" + materials.IndexOf(material));
+
+                    Color color = Color.white;
+                    if (material.HasProperty("_BaseColor"))
+                    {
+                        color = material.GetColor("_BaseColor");
+                    }
+                    else if (material.HasProperty("_Color"))
+                    {
+                        color = material.GetColor("_Color");
+                    }
+                    writer.Write(color.r);
+                    writer.Write(color.g);
+                    writer.Write(color.b);
+                    writer.Write(color.a);
                 } else {
                     WriteString(writer, "missing");
                 }
