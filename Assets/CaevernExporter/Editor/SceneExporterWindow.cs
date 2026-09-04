@@ -54,7 +54,7 @@ public class SceneExporterWindow : EditorWindow
         GUI.enabled = true;
     }
 
-    private void TraverseGameObjects(GameObject gameObject, List<(Mesh mesh, Transform transform)> meshes, bool isRoot)
+    private void TraverseGameObjects(GameObject gameObject, List<(Mesh, Transform, GameObject)> meshes, bool isRoot)
     {
         MeshFilter meshFilter = gameObject.GetComponent<MeshFilter>();
         SkinnedMeshRenderer skinnedMeshRenderer = gameObject.GetComponent<SkinnedMeshRenderer>();
@@ -68,11 +68,11 @@ public class SceneExporterWindow : EditorWindow
 
         if (meshFilter != null && meshFilter.sharedMesh != null)
         {
-            meshes.Add((meshFilter.sharedMesh, transform));
+            meshes.Add((meshFilter.sharedMesh, transform, gameObject));
         }
         else if (skinnedMeshRenderer != null && skinnedMeshRenderer.sharedMesh != null)
         {
-            meshes.Add((skinnedMeshRenderer.sharedMesh, transform));
+            meshes.Add((skinnedMeshRenderer.sharedMesh, transform, gameObject));
         }
 
         foreach (Transform child in gameObject.transform)
@@ -133,6 +133,8 @@ public class SceneExporterWindow : EditorWindow
                 WriteMesh(writer, mesh);
             }
 
+            List<Material> materials = new List<Material>();
+
             writer.Write(rootObjects.Length);
             foreach (GameObject rootObject in rootObjects)
             {
@@ -147,15 +149,26 @@ public class SceneExporterWindow : EditorWindow
                 writer.Write(rootObject.transform.localScale.y);
                 writer.Write(rootObject.transform.localScale.z);
 
-                List<(Mesh mesh, Transform transform)> gameObjects = new();
+                Renderer renderer = rootObject.transform.GetComponent<Renderer>();
+                if (renderer && renderer.sharedMaterial) {
+                    Material material = renderer.sharedMaterial;
+                    if (!materials.Contains(material)) {
+                        materials.Add(material);
+                    }
+                    WriteString(writer, material.name + "@" + materials.IndexOf(material));
+                } else {
+                    WriteString(writer, "missing");
+                }
+
+                List<(Mesh mesh, Transform transform, GameObject gameObject)> gameObjects = new();
 
                 TraverseGameObjects(rootObject, gameObjects, true);
 
                 writer.Write(gameObjects.Count);
-                foreach (var (mesh, transform) in gameObjects)
+                foreach (var (mesh, transform, gameObject) in gameObjects)
                 {
                     int mesh_index = meshes.IndexOf(mesh);
-                    WriteMeshData(writer, mesh, transform, rootObject.transform, mesh_index);
+                    WriteMeshData(writer, mesh, transform, rootObject.transform, gameObject, mesh_index);
                 }
             }
         }
@@ -186,7 +199,7 @@ public class SceneExporterWindow : EditorWindow
         }
     }
 
-    private void WriteMeshData(BinaryWriter writer, Mesh mesh, Transform transform, Transform rootTransform, int mesh_index)
+    private void WriteMeshData(BinaryWriter writer, Mesh mesh, Transform transform, Transform rootTransform, GameObject gameObject, int mesh_index)
     {
         WriteString(writer, mesh.name + "@" + mesh_index);
 
